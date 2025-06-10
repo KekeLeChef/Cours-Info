@@ -1,0 +1,21 @@
+{% block content %}
+            <div class="row">
+                <h1>Admin Area</h1>
+                {% for eachuser in userlist %}
+                    <div class="row" style="margin-bottom: 1ex">
+                        <div>
+                            {{ eachuser.username }}
+                        </div>
+                        <div>
+                            {{ eachuser.preferedcity }}
+                        </div>
+                        <div>
+                            {{ eachuser.lastitinerary }}
+                        </div>
+                        <div>
+                            {{ eachuser.password }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+{% endblock %}

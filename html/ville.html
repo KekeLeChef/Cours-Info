@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte - Ville</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+        /* Style global */
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: #343a40;
+        }
+
+        header {
+            background: linear-gradient(90deg, #49df71, #058d32);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        #map-container {
+            display: flex;
+            flex-direction: column;
+            flex: 3;
+        }
+
+        #map {
+            height: calc(60vh - 40px);
+            border: 1px solid #ccc;
+        }
+
+        #sidebar {
+            flex: 1;
+            background-color: #fdfdfd;
+            padding: 20px;
+            overflow-y: auto;
+            border-top: 2px solid #ccc;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #sidebar h3 {
+            color: #2cba67;
+            margin-bottom: 10px;
+        }
+
+        .button-group {
+            margin: 10px;
+            text-align: center;
+        }
+
+        .button-group button {
+            margin: 5px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .button-group button:hover {
+            transform: scale(1.05);
+        }
+
+        #validateStartBtn {
+            background-color: #10b82f;
+            color: white;
+        }
+
+        #validateStartBtn:hover {
+            background-color: #0c5005;
+        }
+
+        #validateEndBtn {
+            background-color: #2865a7;
+            color: white;
+        }
+
+        #validateEndBtn:hover {
+            background-color: #1c2574;
+        }
+
+        #calculateRouteBtn {
+            background-color: #ffc107;
+            color: #212529;
+            display: none;
+        }
+
+        #calculateRouteBtn:hover {
+            background-color: #d39e00;
+        }
+
+        #resetBtn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        #resetBtn:hover {
+            background-color: #b52b31;
+        }
+
+        #backHomeBtn {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        #backHomeBtn:hover {
+            background-color: #565e64;
+        }
+
+        #routeSummary p, #finalSummary p {
+            margin: 8px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        #finalSummary {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #00b330;
+        }
+
+        /* Zone de détection élargie pour le bandeau latéral */
+        .hover-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 30px; /* Largeur de la zone de détection */
+            z-index: 1000; /* En dessous du bandeau mais au-dessus du contenu principal */
+            cursor: pointer;
+        }
+
+        /* Bandeau latéral */
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -200px; /* Bandeau partiellement visible (50px visible si largeur = 250px) */
+            height: 100%;
+            width: 250px;
+            background-color: #343a40;
+            color: white;
+            overflow-y: auto;
+            transition: left 0.3s ease; /* Transition fluide pour le déplacement */
+            box-shadow: 4px 0 6px rgba(0, 0, 0, 0.2);
+            z-index: 1010; /* Plus élevé que la zone de détection */
+        }
+
+        /* Afficher le bandeau lorsqu'on survole la zone ou le bandeau */
+        .hover-area:hover + .side-menu,
+        .side-menu:hover {
+            left: 0;
+        }
+
+        /* Titre du bandeau */
+        .side-menu h3 {
+            text-align: center;
+            padding: 20px 0;
+            font-size: 20px;
+            border-bottom: 1px solid #555;
+        }
+
+        /* Liens dans le bandeau */
+        .side-menu a {
+            display: block;
+            padding: 15px 20px;
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+
+        /* Survol des liens */
+        .side-menu a:hover {
+            background-color: #00e34c;
+        }
+
+        .side-menu a[href="Carte.html"] {
+            font-size: 24px; /* Taille plus grande pour mettre en valeur */
+            font-weight: bold; /* Texte en gras */
+            text-transform: uppercase; /* Majuscules pour plus d'impact */
+            border-bottom: 2px solid white; /* Ligne décorative */
+            margin-bottom: 10px; /* Espacement avec les autres liens */
+            padding: 20px 20px; /* Augmente la zone cliquable */
+            display: block;
+        }
+
+        /* Style de la barre de recherche */
+        .leaflet-control-geocoder {
+            z-index: 1000; /* Assure que le Geocoder est visible au-dessus des autres éléments */
+        }
+
+        .login-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            margin: 100px auto;
+        }
+        .login-box h2 {
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .login-box button {
+            width: 48%;
+            padding: 10px;
+            margin: 5px 1%;
+            border: none;
+            border-radius: 4px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+        .login-box button:hover {
+            background-color: #218838;
+        }
+        .message {
+            margin-top: 10px;
+            color: red;
+            text-align: center;
+        }
+        #userStatus {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+   
+    </style>
+</head>
+<body>
+    <div id="userStatus" style="
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    font-family: 'Arial', sans-serif;
+">
+    <div id="userInfo" style="
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        width: max-content;
+    ">
+        🔒 Déconnecté
+        <button id="logoutBtn" style="
+            display: none;
+            margin-left: 10px;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        ">Se déconnecter</button>
+    </div>
+</div>
+    <div class="side-menu">
+        <h3>Navigation</h3>
+        <a href="Carte.html">Menu</a>
+        <div id="villes"></div>
+    </div>
+    <div id="main-container"></div>
+    <header>
+
+    <div id="specialContent">
+        <h1 id="ville-name"></h1>
+    </div>
+
+        <div class="hover-area"></div> <!-- Zone de détection -->
+        <div class="side-menu">
+            <h3>Navigation</h3>
+            <a href="http://127.0.0.1/ville">Menu</a>
+            <div id="villes-list">
+                <a href="http://127.0.0.1/ville.html?ville=amiens">Amiens</a>
+                <a href="http://127.0.0.1/ville.html?ville=besancon">Besançon</a>
+                <a href="http://127.0.0.1/ville.html?ville=bruxelles">Bruxelles</a>
+                <a href="http://127.0.0.1/ville.html?ville=cergy-pontoise">Cergy-Pontoise</a>
+                <a href="http://127.0.0.1/ville.html?ville=creteil">Créteil</a>
+                <a href="http://127.0.0.1/ville.html?ville=dublin">Dublin</a>
+                <a href="http://127.0.0.1/ville.html?ville=ljubljana">Ljubljana</a>
+                <a href="http://127.0.0.1/ville.html?ville=lund">Lund</a>
+                <a href="http://127.0.0.1/ville.html?ville=luxembourg">Luxembourg</a>
+                <a href="http://127.0.0.1/ville.html?ville=lyon">Lyon</a>
+                <a href="http://127.0.0.1/ville.html?ville=maribor">Maribor</a>
+                <a href="http://127.0.0.1/ville.html?ville=mulhouse">Mulhouse</a>
+                <a href="http://127.0.0.1/ville.html?ville=namur">Namur</a>
+                <a href="http://127.0.0.1/ville.html?ville=nancy">Nancy</a>
+                <a href="http://127.0.0.1/ville.html?ville=nantes">Nantes</a>
+                <a href="http://127.0.0.1/ville.html?ville=seville">Séville</a>
+                <a href="http://127.0.0.1/ville.html?ville=toulouse">Toulouse</a>
+                <a href="http://127.0.0.1/ville.html?ville=toyama">Toyama</a>
+                <a href="http://127.0.0.1/ville.html?ville=valence">Valence</a>
+            </div>
+        </div>
+    </header>
+    <div id="mapWrap">
+    <div id="main-container">
+        <div id="map-container">
+
+            
+            <div id="map"></div>
+            
+
+            <div class="button-group">
+                <button id="validateStartBtn">Valider le départ</button>
+                <button id="validateEndBtn">Valider l'arrivée</button>
+                <button id="calculateRouteBtn">Confirmer le trajet</button>
+                <button id="resetBtn">Réinitialiser</button>
+                <button id="save-btn" onclick="saveCurrentItinerary()">Sauvegarder ce trajet</button>
+
+            </div>
+        </div>
+        <aside id="sidebar">
+            <center>
+                <h3>Résumé des trajets</h3>
+                <div id="routeSummary"></div>
+                <div id="finalSummary"></div>
+            </center>
+        </aside>
+    </div>
+    </div>
+    <div id="user-name-display" style="position: absolute; top: 10px; right: 10px; font-weight: bold;"></div>
+
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const ville = params.get('ville');
+        document.getElementById('ville-name').innerText = `Carte de ${ville}`;
+
+        const apiKey = '5b3ce3597851110001cf62482aa2562570e9ee0764c462d7e6ba038b33a51a4bdaf342ca7796e20f'; // Clé de openrouteservice
+        let map = L.map('map').setView([47.2184, -1.5536], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        let stations = [];
+        let startLatLng = null, endLatLng = null;
+        let startMarker = null, endMarker = null;
+        let routeLines = [];
+        let stationMarkers = []; // Liste pour garder une trace des marqueurs de stations
+
+        let closestStartStation = null, closestEndStation = null;
+
+        let totalDistance = 0;
+        let totalDuration = 0;
+
+        // Charger les stations pour la ville
+        fetch(`/stations/${ville}`)
+            .then(response => response.json())
+            .then(data => {
+                stations = data;
+                if (stations.length > 0) {     
+                    map.setView([stations[0].latitude, stations[0].longitude], 13);
+                
+                }
+            });
+
+        // Ajouter un contrôle de recherche sur la carte
+        const geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false
+        })
+        .on('markgeocode', function (e) {
+            const bbox = e.geocode.bbox;
+            const poly = L.polygon([
+                [bbox.getSouthEast().lat, bbox.getSouthEast().lng],
+                [bbox.getNorthEast().lat, bbox.getNorthEast().lng],
+                [bbox.getNorthWest().lat, bbox.getNorthWest().lng],
+                [bbox.getSouthWest().lat, bbox.getSouthWest().lng]
+            ]);
+            map.fitBounds(poly.getBounds()); // Zoom sur la zone trouvée
+
+            // Ajouter un marqueur personnalisé pour l'adresse recherchée
+            const searchMarkerIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/1484/1484586.png', // URL de l'icône
+                iconSize: [32, 32], // Taille de l'icône
+                iconAnchor: [16, 32], // Point d'ancrage de l'icône
+                popupAnchor: [0, -32] // Position du popup
+            });
+
+            const searchMarker = L.marker(e.geocode.center, { icon: searchMarkerIcon })
+                .addTo(map)
+                .bindPopup(`<b>Adresse trouvée :</b> ${e.geocode.name}<br><i>Cliquez pour supprimer ce marqueur.</i>`)
+                .openPopup();
+
+            // Supprimer le marqueur lorsqu'on clique dessus
+            searchMarker.on('click', function () {
+                map.removeLayer(searchMarker);
+            });
+        })
+        .addTo(map); // Ajout du contrôle Geocoder à la carte
+
+        function calculateRouteGeneric(start, end, mode, color, description, desc = false) {
+    const modeMapping = {
+        foot: 'foot-walking',
+        bike: 'cycling-regular'
+    };
+
+    const toLngLat = (point) => {
+        if (Array.isArray(point)) {
+            return [point[1], point[0]]; // [lng, lat]
+        } else if (typeof point === 'object' && 'lat' in point && 'lng' in point) {
+            return [point.lng, point.lat]; // {lat: ..., lng: ...}
+        } else {
+            throw new Error("Format de coordonnées non supporté.");
+        }
+    };
+
+    const [startLng, startLat] = toLngLat(start);
+    const [endLng, endLat] = toLngLat(end);
+
+    const url = `https://api.openrouteservice.org/v2/directions/${modeMapping[mode]}?api_key=${apiKey}&start=${startLng},${startLat}&end=${endLng},${endLat}`;
+
+    return fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            const route = data.features[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+            const segment = data.features[0].properties.segments[0];
+
+            const line = L.polyline(route, { color, weight: 4 }).addTo(map);
+            routeLines.push(line);
+
+            totalDistance += segment.distance;
+            totalDuration += segment.duration;
+
+            if (desc) {
+                const summaryHTML = `
+                    <h4>${description}</h4>
+                    <p>Distance: ${(segment.distance / 1000).toFixed(2)} km</p>
+                    <p>Temps estimé: ${Math.round(segment.duration / 60)} minutes</p>
+                `;
+                document.getElementById("routeSummary").innerHTML += summaryHTML;
+            }
+
+            return {
+                description,
+                distance: segment.distance,
+                duration: segment.duration
+            };
+        })
+        .catch(error => {
+            console.error('Erreur lors du calcul de la route :', error);
+            alert(`Erreur dans le calcul de l'itinéraire : ${description}`);
+        });
+}
+
+
+        async function calculateShortestRoute(point, stations) {
+            let shortestRoute = null;
+            let shortestDistance = Infinity;
+
+            for (const station of stations) {
+                const distance = await calculateRouteGeneric(
+                    [point.lat, point.lng],
+                    [station.latitude, station.longitude],
+                    'foot',
+                    'None',
+                    'Calcul de la distance',
+                    false
+                ).then(data => data.distance);
+
+                if (distance < shortestDistance) {
+                    shortestDistance = distance;
+                    shortestRoute = { station, distance };
+                }
+            }
+
+            return shortestRoute;
+        }
+
+        map.on('click', async e => {
+            if (!startLatLng) {
+                startLatLng = e.latlng;
+                startMarker = L.marker(startLatLng).addTo(map).bindPopup("Point de départ").openPopup();
+
+                // Afficher les 3 stations les plus proches du point de départ
+                const nearestStations = stations
+                    .map(station => ({
+                        ...station,
+                        distance: calculateDistance(startLatLng.lat, startLatLng.lng, station.latitude, station.longitude)
+                    }))
+                    .sort((a, b) => a.distance - b.distance)
+                    .slice(0, 3);
+
+                nearestStations.forEach(station => {
+                    const marker = L.marker([station.latitude, station.longitude])
+                        .bindPopup(`<b>${station.nom}</b>`)
+                        .addTo(map);
+                    stationMarkers.push(marker); // Ajouter le marqueur à la liste
+                });
+
+                // Calculer le plus court chemin vers la station la plus proche
+                const shortestRoute = await calculateShortestRoute(startLatLng, nearestStations);
+                if (shortestRoute) {
+                    closestStartStation = shortestRoute.station;
+                }
+            } else if (!endLatLng) {
+                endLatLng = e.latlng;
+                endMarker = L.marker(endLatLng).addTo(map).bindPopup("Point d'arrivée").openPopup();
+
+                // Afficher les 3 stations les plus proches du point d'arrivée
+                const nearestStations = stations
+                    .map(station => ({
+                        ...station,
+                        distance: calculateDistance(endLatLng.lat, endLatLng.lng, station.latitude, station.longitude)
+                    }))
+                    .sort((a, b) => a.distance - b.distance)
+                    .slice(0, 3);
+
+                nearestStations.forEach(station => {
+                    const marker = L.marker([station.latitude, station.longitude])
+                        .bindPopup(`<b>${station.nom}</b>`)
+                        .addTo(map);
+                    stationMarkers.push(marker); // Ajouter le marqueur à la liste
+                });
+
+                // Calculer le plus court chemin vers la station la plus proche
+                const shortestRoute = await calculateShortestRoute(endLatLng, nearestStations);
+                if (shortestRoute) {
+                    closestEndStation = shortestRoute.station;
+                }
+
+                document.getElementById('calculateRouteBtn').style.display = 'inline-block';
+            }
+        });
+
+        document.getElementById('validateStartBtn').addEventListener('click', async () => {
+            if (!startLatLng) return alert('Veuillez définir un point de départ.');
+            if (closestStartStation) {
+                await calculateRouteGeneric(
+                    [startLatLng.lat, startLatLng.lng],
+                    [closestStartStation.latitude, closestStartStation.longitude],
+                    'foot',
+                    'blue',
+                    'Trajet entre le point de départ et la station la plus proche',
+                    true
+                );
+            }
+        });
+
+        document.getElementById('validateEndBtn').addEventListener('click', async () => {
+            if (!endLatLng) return alert('Veuillez définir un point d\'arrivée.');
+            if (closestEndStation) {
+                await calculateRouteGeneric(
+                    [endLatLng.lat, endLatLng.lng],
+                    [closestEndStation.latitude, closestEndStation.longitude],
+                    'foot',
+                    'green',
+                    'Trajet entre le point d\'arrivée et la station la plus proche',
+                    true
+                );
+            }
+        });
+
+        document.getElementById('calculateRouteBtn').addEventListener('click', async () => {
+            if (closestStartStation && closestEndStation) {
+                await calculateRouteGeneric(
+                    [closestStartStation.latitude, closestStartStation.longitude],
+                    [closestEndStation.latitude, closestEndStation.longitude],
+                    'bike',
+                    'red',
+                    'Trajet entre les stations de départ et d\'arrivée',
+                    true
+                );
+            } else {
+                alert('Veuillez valider les points de départ et d\'arrivée.');
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            // Supprimer tous les marqueurs et lignes de la carte
+            [startMarker, endMarker, ...routeLines, ...stationMarkers].forEach(layer => {
+                if (layer) map.removeLayer(layer);
+            });
+            startLatLng = null;
+            endLatLng = null;
+            closestStartStation = null;
+            closestEndStation = null;
+            routeLines = [];
+            stationMarkers = []; // Réinitialiser la liste des marqueurs de stations
+            totalDistance = 0;
+            totalDuration = 0;
+            document.getElementById('routeSummary').innerHTML = '';
+            document.getElementById('finalSummary').innerHTML = '';
+            document.getElementById('calculateRouteBtn').style.display = 'none';
+        });
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Rayon de la Terre en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        async function loadFavoriteRoute(data) {
+            startLatLng = data.departure;
+            endLatLng = data.arrival;
+            closestStartStation = data.start_station;
+            closestEndStation = data.end_station;
+
+            startMarker = L.marker(startLatLng).addTo(map).bindPopup("Point de départ").openPopup();
+            endMarker = L.marker(endLatLng).addTo(map).bindPopup("Point d'arrivée").openPopup();
+
+            L.marker([closestStartStation.latitude, closestStartStation.longitude])
+                .addTo(map)
+                .bindPopup(`<b>${closestStartStation.nom}</b>`);
+
+            L.marker([closestEndStation.latitude, closestEndStation.longitude])
+                .addTo(map)
+                .bindPopup(`<b>${closestEndStation.nom}</b>`);
+
+            await calculateRouteGeneric(startLatLng, [closestStartStation.latitude, closestStartStation.longitude], 'foot', 'blue', 'Départ vers station');
+            await calculateRouteGeneric([closestStartStation.latitude, closestStartStation.longitude], [closestEndStation.latitude, closestEndStation.longitude], 'bike', 'red', 'Trajet vélo');
+            await calculateRouteGeneric([closestEndStation.latitude, closestEndStation.longitude], endLatLng, 'foot', 'green', 'Station vers arrivée');
+        }
+
+        function displayContentBasedOnURL() {
+            const path = window.location.pathname;
+            const contentDiv = document.getElementById('main-container');
+
+            if (path === '/ville') {
+                contentDiv.innerHTML = `
+                <div class="login-box">
+            <h2>Inscription</h2>
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <input type="text" name="username" placeholder="Nom d'utilisateur" required>
+                <input type="password" name="password" placeholder="Mot de passe" required>
+                <button type="submit">S'inscrire</button>
+            </form>
+                    <div id="registerMessage" class="message"></div>
+                    <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="goToFavorite()">Mon trajet favori</button>
+                    </div>
+                </div>
+                `;
+            }
+        }
+
+        function saveUserToLocalStorage() {
+            const username = document.querySelector('input[name="username"]').value;
+            localStorage.setItem('username', username);
+        }
+
+        function goToFavorite() {
+            const username = localStorage.getItem('username');
+            if (!username) return alert("Aucun utilisateur enregistré.");
+
+            fetch(`/get_favorite_url?username=${encodeURIComponent(username)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.url) {
+                        window.location.href = data.url;
+                    } else {
+                        alert("Aucun trajet favori trouvé.");
+                    }
+                })
+                .catch(() => alert("Erreur lors de la récupération du trajet favori."));
+        }
+
+        function saveCurrentItinerary() {
+            const username = localStorage.getItem('username');
+            if (!username) return alert("Veuillez vous connecter d'abord.");
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const ville = urlParams.get('ville');
+
+            if (!startLatLng || !endLatLng || !closestStartStation || !closestEndStation) {
+                return alert("Veuillez d'abord tracer un trajet complet.");
+            }
+
+            const itinerary = {
+                ville: ville,
+                departure: startLatLng,
+                arrival: endLatLng,
+                start_station: closestStartStation,
+                end_station: closestEndStation,
+                mode: "bike"
+            };
+
+            fetch('/save_itinerary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, itinerary })
+            })
+            .then(res => res.text())
+            .then(msg => alert(msg))
+            .catch(() => alert("Erreur lors de la sauvegarde du trajet."));
+        }
+
+        window.onload = async function () {
+            displayContentBasedOnURL();
+
+            const username = localStorage.getItem('username');
+            if (username) {
+        const statusDiv = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        statusDiv.innerHTML = `🔒 Connecté en tant que ${username} <button id="logoutBtn" style="
+            display: none;
+            margin-left: 10px;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        ">Se déconnecter</button>`;
+
+        const newLogoutBtn = document.getElementById('logoutBtn');
+
+        statusDiv.addEventListener('mouseenter', () => {
+            newLogoutBtn.style.display = 'inline-block';
+        });
+        statusDiv.addEventListener('mouseleave', () => {
+            newLogoutBtn.style.display = 'none';
+        });
+
+        newLogoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('username');
+            window.location.reload(); // recharge la page sans utilisateur
+        });
+    }
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentVille = urlParams.get('ville');
+
+            if (username && currentVille) {
+                const response = await fetch(`/get_itinerary_json?username=${username}`);
+                const data = await response.json();
+                if (data && data.ville === currentVille) {
+                    setTimeout(() => loadFavoriteRoute(data), 1000); // attendre que la carte charge si besoin
+                }
+            }
+        }
+
+        function handleRegister(event) {
+    event.preventDefault(); // Empêche le rechargement
+
+    const username = document.querySelector('input[name="username"]').value;
+    const password = document.querySelector('input[name="password"]').value;
+    const messageBox = document.getElementById('registerMessage');
+
+    // Sauvegarde locale
+    localStorage.setItem('username', username);
+
+    fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+    })
+    .then(async response => {
+        if (response.redirected) {
+            window.location.href = response.url; // Redirection vers la carte
+        } else {
+            const error = await response.text();
+            messageBox.innerText = error;
+        }
+    })
+    .catch(err => {
+        messageBox.innerText = "Erreur de connexion au serveur.";
+    });
+}
+
+
+window.addEventListener("DOMContentLoaded", () => {
+    const path = window.location.pathname;
+    const special = document.getElementById("specialContent");
+    const mapWrapper = document.getElementById('mapWrap');
+    if (!path.includes("/ville.html")) {
+        special.style.display = "none";
+        mapWrapper.style.display = 'none';
+    }
+});
+
+    </script>
+</body>
+</html>
+<!-- End of file: ville.html -->
